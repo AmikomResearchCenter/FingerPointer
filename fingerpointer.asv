@@ -1,0 +1,297 @@
+function varargout = fingerpointer(varargin)
+% FINGERPOINTER M-file for fingerpointer.fig
+%      FINGERPOINTER, by itself, creates a new FINGERPOINTER or raises the existing
+%      singleton*.
+%
+%      H = FINGERPOINTER returns the handle to a new FINGERPOINTER or the handle to
+%      the existing singleton*.
+%
+%      FINGERPOINTER('CALLBACK',hObject,eventData,handles,...) calls the local
+%      function named CALLBACK in FINGERPOINTER.M with the given input arguments.
+%
+%      FINGERPOINTER('Property','Value',...) creates a new FINGERPOINTER or raises the
+%      existing singleton*.  Starting from the left, property value pairs are
+%      applied to the GUI before fingerpointer_OpeningFcn gets called.  An
+%      unrecognized property name or invalid value makes property application
+%      stop.  All inputs are passed to fingerpointer_OpeningFcn via varargin.
+%
+%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
+%      instance to run (singleton)".
+%
+% See also: GUIDE, GUIDATA, GUIHANDLES
+
+% Edit the above text to modify the response to help fingerpointer
+
+% Last Modified by GUIDE v2.5 18-Jul-2011 11:44:24
+
+% Begin initialization code - DO NOT EDIT
+gui_Singleton = 1;
+gui_State = struct('gui_Name',       mfilename, ...
+                   'gui_Singleton',  gui_Singleton, ...
+                   'gui_OpeningFcn', @fingerpointer_OpeningFcn, ...
+                   'gui_OutputFcn',  @fingerpointer_OutputFcn, ...
+                   'gui_LayoutFcn',  [] , ...
+                   'gui_Callback',   []);
+if nargin && ischar(varargin{1})
+    gui_State.gui_Callback = str2func(varargin{1});
+end
+
+if nargout
+    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+else
+    gui_mainfcn(gui_State, varargin{:});
+end
+% End initialization code - DO NOT EDIT
+
+
+% --- Executes just before fingerpointer is made visible.
+function fingerpointer_OpeningFcn(hObject, eventdata, handles, varargin)
+% This function has no output args, see OutputFcn.
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% varargin   command line arguments to fingerpointer (see VARARGIN)
+set(handles.preview,'Enable','on');
+set(handles.detect,'Enable','off');
+set(handles.stop,'Enable','off');
+set(handles.reset,'Enable','off');
+global vid
+global hImage;
+vid=videoinput('winvideo',1,'RGB24_160x120');
+set(vid,'ReturnedColorSpace','rgb');
+set(vid,'TriggerFrameDelay',5);
+set(vid,'TriggerRepeat',Inf);
+vid.FrameGrabInterval=3;%==>  .5
+vidRes = get(vid, 'VideoResolution');
+%mendapatkan nilai warna dari video
+nBands = get(vid, 'NumberOfBands');
+%untuk menampilkan farme webcam pada layar1
+hImage = image( zeros(vidRes(2), vidRes(1), nBands),'parent',handles.cam);
+axis off
+% Choose default command line output for fingerpointer
+handles.output = hObject;
+
+% Update handles structure
+guidata(hObject, handles);
+
+% UIWAIT makes fingerpointer wait for user response (see UIRESUME)
+% uiwait(handles.figure1);
+
+
+% --- Outputs from this function are returned to the command line.
+function varargout = fingerpointer_OutputFcn(hObject, eventdata, handles) 
+% varargout  cell array for returning output args (see VARARGOUT);
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Get default command line output from handles structure
+varargout{1} = handles.output;
+
+
+% --- Executes on button press in preview.
+function preview_Callback(hObject, eventdata, handles)
+% hObject    handle to preview (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global vid
+global hImage;
+preview(vid, hImage);
+set(handles.preview,'Enable','off');
+set(handles.detect,'Enable','on');
+set(handles.stop,'Enable','off');
+set(handles.reset,'Enable','off');
+
+% --- Executes on button press in detect.
+function detect_Callback(hObject, eventdata, handles)
+% hObject    handle to detect (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+set(handles.preview,'Enable','off');
+set(handles.detect,'Enable','off');
+set(handles.stop,'Enable','on');
+set(handles.reset,'Enable','off');
+global vid;
+global mouse;
+import java.awt.Robot;
+import java.awt.event.*;
+mouse=Robot;
+start(vid);
+%proses image
+while(1)%vid.FramesAcquired<=70
+   f=getsnapshot(vid);
+%    subplot(221);imshow(f);title('a');
+   I=f;
+   Iblur=fspecial('gaussian',8,35);
+   I=imfilter(I,Iblur,'symmetric','conv');
+   %deteksi kulit
+   YCbCr=rgb2ycbcr(I);
+%    subplot(222);imshow(YCbCr);title('b');
+   for i=1:size(YCbCr,1)
+       for j=1:size(YCbCr,2)
+            cb=YCbCr(i,j,2);
+            cr=YCbCr(i,j,3);
+%              if(~(cr >= 120 && cr <= 173 && cb >= 77 && cb <= 127))
+%             if(~(cr >= 125 && cr <=153 && cb >= 100 && cb <= 120))
+            if(~(cr >= 133 && cr <=153 && cb >= 106 && cb <= 126))
+               %bukan warna kulit
+               YCbCr(i,j)=0;
+            else
+                YCbCr(i,j)=255;
+            end
+        end
+   end
+   Irgb=ycbcr2rgb(YCbCr);
+   kulit=im2bw(Irgb);
+    kulitt=im2bw(Irgb);
+   kulit=bwareaopen(kulit,100);  
+   %------------------------
+   [B L]=bwboundaries(kulit,'noholes');
+   bw=bwlabel(kulit,8);
+   rp=regionprops(bw,'centroid');
+   tgh=cat(1,rp.Centroid);
+  imshow(f);
+   hold on
+   for k=1:length(B)
+       boundary=B{k};
+       pixX=boundary(:,2);
+       pixY=boundary(:,1);
+%        plot(boundary(:,2),boundary(:,1),'w','LineWidth',1);
+       plot(tgh(:,1),tgh(:,2),'b*');
+       xc=double(tgh(:,1));
+       Ux=zeros();Uy=zeros();Vx=zeros();Vy=zeros();
+       pU=zeros();pV=zeros();U=zeros(2);V=zeros(2);m=zeros();
+       sudut=zeros();a=[];b=[];z=[];
+       s=length(pixX)-14;
+       for i=1:length(pixX)
+           if (i-14)<1
+               Ux(i)=pixX(i+s)-pixX(i);
+               Uy(i)=pixY(i+s)-pixY(i);
+               Vx(i)=pixX(i+14)-pixX(i);
+               Vy(i)=pixY(i+14)-pixY(i);
+           elseif (i+14)>length(pixY)
+               Vx(i)=pixX(i-s)-pixX(i);
+               Vy(i)=pixY(i-s)-pixY(i);
+               Ux(i)=pixX(i-14)-pixX(i);
+               Uy(i)=pixY(i-14)-pixY(i);
+           else
+               Ux(i)=pixX(i-14)-pixX(i);
+               Uy(i)=pixY(i-14)-pixY(i);
+               Vx(i)=pixX(i+14)-pixX(i);
+               Vy(i)=pixY(i+14)-pixY(i);
+           end
+           pU(i)=sqrt(Ux(i)*Ux(i)+Uy(i)*Uy(i));
+           pV(i)=sqrt(Vx(i)*Vx(i)+Vy(i)*Vy(i));
+           U(:,i)=[Ux(i)  Uy(i)];
+           V(:,i)=[Vx(i)  Vy(i)];
+           m(i)=(dot(U(:,i),V(:,i)))/(pU(i)*pV(i));
+           sudut(i)=acos(m(i)); 
+           a(:,:,i)=[Ux(i)  Uy(i) 0];
+           b(:,:,i)=[Vx(i)  Vy(i) 0];
+           z(:,:,i)=cross(b(:,:,i),a(:,:,i));
+       end 
+       zet=z(:,3,:);
+       zp=find(zet>0);
+       sdt=sudut(zp);%-- sudut z positif ada yang besar ada yng kecil
+       sdtK=find(sdt<0.872664626 & sdt>0.6000);%1.308996939
+       ind=zp(sdtK);
+       tipX=pixX(ind);
+       tipY=pixY(ind);
+        plot(tipX,tipY,'r*','LineWidth',1);
+       n=zeros(); %-----------------------------------> mulai jumlah jari berdasar pix X
+       for i=1:(length(tipX)-1)
+           n(i)=tipX(i+1)-tipX(i);
+           m(i)=tipY(i+1)-tipY(i);
+       end
+       q=find (n>3);
+       r=find(m>3);
+       if  length(n)==1 && length(xc)==1 &&isempty(q)
+           jmlTip=0; 
+       else if isempty(q) && length(xc)==1
+               jmlTip=1;              
+           else if ~isempty(q) && length(xc)==1
+                   jmlTip=length(q)+1; 
+               else if  ~isempty(r) && length(xc)==1
+                       jmlTip=length(r)+1; 
+                   end
+               end
+           end
+       end
+%        k %-----------------------------------------------> end jumlah
+%        jari
+       if length(tipX)>1 %ppixX
+            p1pixX=double(tipX(1));%ppixX
+            p1pixY=double(tipY(1));%ppixY
+       else
+           continue
+       end
+       ptrX=int32((p1pixX/160)*1280);
+       ptrY=int32((p1pixY/120)*800);
+         if jmlTip==1 && length(xc)==1
+          mouse.mouseMove((1280-ptrX),ptrY);
+            else if jmlTip==2 && length(xc)==1
+                    mouse.mousePress(InputEvent.BUTTON1_MASK);
+                     mouse.delay(395);
+                     mouse.mouseRelease(InputEvent.BUTTON1_MASK);
+                else if jmlTip==3 &&length(xc)==1
+                        mouse.mousePress(InputEvent.BUTTON3_MASK);
+                         mouse.delay(395);
+                         mouse.mouseRelease(InputEvent.BUTTON3_MASK);
+                    else if jmlTip>3 && length(xc)==1
+                           continue
+                        end
+                    end
+                end
+         end
+   end
+  hold off
+  flushdata(vid);
+     val = get(handles.stop,'Value');
+   if val == 1
+       break;
+   end
+end
+stop(vid);
+delete(vid);
+clear vid;
+
+% --- Executes on button press in reset.
+function reset_Callback(hObject, eventdata, handles)
+% hObject    handle to reset (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+set(handles.stop,'Value',0);
+cla(handles.cam,'reset');
+axis off
+global vid
+global hImage;
+vid=videoinput('winvideo',1,'RGB24_160x120');
+set(vid,'ReturnedColorSpace','rgb');
+set(vid,'TriggerFrameDelay',5);
+set(vid,'TriggerRepeat',Inf);
+vid.FrameGrabInterval=3;%==>  .5
+vidRes = get(vid, 'VideoResolution');
+%mendapatkan nilai warna dari video
+nBands = get(vid, 'NumberOfBands');
+%untuk menampilkan farme webcam pada layar1
+hImage = image( zeros(vidRes(2), vidRes(1), nBands),'parent',handles.cam);
+axis off
+set(handles.preview,'Enable','on');
+set(handles.detect,'Enable','off');
+set(handles.stop,'Enable','off');
+set(handles.reset,'Enable','off');
+
+% --- Executes on button press in stop.
+function stop_Callback(hObject, eventdata, handles)
+% hObject    handle to stop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global vid;
+stoppreview(vid);
+set(handles.preview,'Enable','off');
+set(handles.detect,'Enable','off');
+set(handles.stop,'Enable','off');
+set(handles.reset,'Enable','on');
+% Hint: get(hObject,'Value') returns toggle state of stop
+
+
