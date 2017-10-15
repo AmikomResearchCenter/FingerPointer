@@ -1,4 +1,5 @@
 # FingerPointer
+![alt txt](https://github.com/AmikomResearchCenter/FingerPointer/blob/master/screenshoot.png "screen shoot fingertips detection")
 The FingerPointer is a project for control the computer's cursor by touchless finger. 
 The FingerPointer is a project for control the computer's cursor by touchless finger. It will automaticlly detect your hand and you can interact with computer by moving your finger in front of webcam. 
 The left-click event is triggered by opening two finger, while the righ-click event is done by opening three finger.
